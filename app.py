@@ -1,5 +1,5 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 import os
 import requests
 from bs4 import BeautifulSoup
@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Extract article text from a URL
 def extract_article_text(url):
@@ -27,12 +27,12 @@ def analyze_section(instruction, article):
 
     TASK: {instruction} (Respond in concise bullet points. Keep total length under 100 words.)
     """
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3
     )
-    return response['choices'][0]['message']['content'].strip()
+    return response.choices[0].message.content.strip()
 
 # Streamlit app
 st.set_page_config(page_title="News Insight Agent", layout="wide")

@@ -1,0 +1,70 @@
+import streamlit as st
+import openai
+import os
+import requests
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Extract article text from a URL
+def extract_article_text(url):
+    try:
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        paragraphs = soup.find_all('p')
+        return ' '.join(p.get_text() for p in paragraphs if p.get_text())
+    except Exception as e:
+        return f"Error extracting article: {e}"
+
+# Generate analysis for a section
+def analyze_section(section_name, instruction, article):
+    prompt = f"""
+    ARTICLE:
+    {article}
+
+    TASK: {instruction}
+    """
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
+    return response['choices'][0]['message']['content'].strip()
+
+# Streamlit app layout
+st.set_page_config(page_title="News Insight Agent", layout="centered")
+st.title("🧠 News Analysis Agent")
+st.write("Paste a **news article URL** below to explore multiple perspectives and deeper context.")
+
+url = st.text_input("Enter Article URL")
+
+if st.button("Analyze"):
+    if not url.strip():
+        st.warning("Please enter a valid URL.")
+    else:
+        with st.spinner("Extracting article and analyzing..."):
+            article = extract_article_text(url)
+
+            if article.startswith("Error"):
+                st.error(article)
+            else:
+                sections = {
+                    "🧾 Summary": "Summarize the article with bullet points and emojis to make it visually engaging. Highlight the key points in 4–5 concise lines.",
+                    "🎯 Narrative & Framing": "What is the main narrative or message in this article? What framing is used to present it?",
+                    "📣 Tone & Bias": "Analyze the tone and any ideological bias. Is the article sympathetic to one side?",
+                    "🧱 Missing or Underrepresented Facts": "What relevant facts or perspectives might be missing or underexplored?",
+                    "🔄 Alternative Viewpoints": "Suggest two alternative viewpoints or interpretations from credible perspectives.",
+                    "🌍 Context": "Add historical or geopolitical context that helps explain the issue.",
+                    "⚠️ Misinterpretation Risk": "How could the article be misinterpreted or weaponized if taken out of context?",
+                    "📚 Further Reading": "List 2–3 reputable sources offering additional or contrasting coverage."
+                }
+
+                for section, instruction in sections.items():
+                    with st.expander(section, expanded=(section == "🧾 Summary")):
+                        output = analyze_section(section, instruction, article)
+                        st.markdown(output, unsafe_allow_html=True)
+
+        st.success("Analysis complete. Scroll up to review.")
